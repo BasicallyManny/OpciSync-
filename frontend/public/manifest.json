@@ -1,0 +1,20 @@
+{
+  "manifest_version": 3,
+  "name": "OpCity Lead Automator",
+  "description": "Pulls lead information from OpCity and automates data entry tasks.",
+  "version": "0.1.0",
+  "permissions": ["scripting", "activeTab", "tabs"],
+  "host_permissions": ["https://*.opcity.com/*"],
+  "action": {
+    "default_popup": "index.html"
+  },
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
+  "icons": {
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  }
+}
