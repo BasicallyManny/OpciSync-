@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import type { Lead } from "./types/types";
 
-export default function Popup() {
+export default function App() {
   const [leads, setLeads] = useState<Lead[]>([]);
   const [loading, setLoading] = useState(false);
 
