@@ -6,7 +6,7 @@ export type LeadStatus =
   | "CLOSE";
 
 export interface Lead {
-    name:string;
-    status:LeadStatus;
-    lastUpdated: string;
+  name: string;
+  status: LeadStatus;
+  lastUpdated: string;
 }
