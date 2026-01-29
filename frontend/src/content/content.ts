@@ -37,13 +37,20 @@ function injectSpinnerStyles(): void {
       border-radius: 50%;
       animation: spin 1s linear infinite;
     }
+    .opcisync-message {
+      text-align: center;
+      font-size: 14px;
+    }
     @keyframes spin { to { transform: rotate(360deg); } }
   `;
   document.head.appendChild(style);
 }
 
-function showSpinner(): void {
-  if (document.getElementById(SPINNER_ID)) return;
+function showSpinner(message: string = "Syncing leads…"): void {
+  if (document.getElementById(SPINNER_ID)) {
+    updateSpinnerMessage(message);
+    return;
+  }
   injectSpinnerStyles();
 
   const overlay = document.createElement("div");
@@ -52,11 +59,18 @@ function showSpinner(): void {
     <div class="opcisync-backdrop">
       <div class="opcisync-box">
         <div class="opcisync-spinner"></div>
-        <div>Syncing leads…</div>
+        <div class="opcisync-message">${message}</div>
       </div>
     </div>
   `;
   document.body.appendChild(overlay);
+}
+
+function updateSpinnerMessage(message: string): void {
+  const messageEl = document.querySelector(`#${SPINNER_ID} .opcisync-message`);
+  if (messageEl) {
+    messageEl.textContent = message;
+  }
 }
 
 function hideSpinner(): void {
@@ -70,7 +84,6 @@ const sleep = (ms: number): Promise<void> =>
 
 /* ---------------- Selectors ---------------- */
 
-// Try multiple possible selectors
 const SELECTOR_VARIANTS = {
   scrollContainers: [
     ".ReferralList__scrollingwindow",
@@ -98,6 +111,17 @@ const SELECTOR_VARIANTS = {
     ".ReferralItem_time-since",
     "[class*='time']",
     "[class*='Updated']"
+  ],
+  updateStatusButton: [
+    ".StatusButton_primary",
+    "button.StatusButton_primary",
+    "[class*='StatusButton'][class*='primary']",
+    "button[class*='Update']"
+  ],
+  backButton: [
+    "[class*='back']",
+    "button[aria-label*='back']",
+    "a[class*='back']"
   ]
 };
 
@@ -107,11 +131,19 @@ function findWorkingSelector(selectors: string[]): string | null {
   for (const selector of selectors) {
     const element = document.querySelector(selector);
     if (element) {
-      console.log(`✓ Found working selector: ${selector}`);
       return selector;
     }
   }
-  console.log(`✗ None of these selectors worked:`, selectors);
+  return null;
+}
+
+function findElement(selectors: string[]): HTMLElement | null {
+  for (const selector of selectors) {
+    const element = document.querySelector(selector) as HTMLElement | null;
+    if (element) {
+      return element;
+    }
+  }
   return null;
 }
 
@@ -123,7 +155,6 @@ function extractStatus(card: Element): LeadStatus {
     const statusEl = card.querySelector(selector);
     if (statusEl) {
       const statusText = statusEl.textContent?.trim().toUpperCase() || "";
-      console.log(`Found status text: "${statusText}"`);
       
       if (statusText.includes("SPOKE")) return "SPOKE";
       if (statusText.includes("MET")) return "MET";
@@ -135,7 +166,6 @@ function extractStatus(card: Element): LeadStatus {
   
   // Fallback: check card classes
   const className = card.className;
-  console.log(`Card classes: ${className}`);
   
   if (className.includes("success")) return "CLOSE";
   if (className.includes("contract")) return "CONTRACT";
@@ -148,28 +178,20 @@ function extractStatus(card: Element): LeadStatus {
 
 function scrapeVisibleLeads(cardSelector: string): Lead[] {
   const cards = document.querySelectorAll(cardSelector);
-  console.log(`Found ${cards.length} lead cards with selector: ${cardSelector}`);
-  
   const leads: Lead[] = [];
 
-  cards.forEach((card, index) => {
-    console.log(`\nProcessing card ${index + 1}:`);
-    
+  cards.forEach((card) => {
     // Try to find name
     let name = "";
     for (const selector of SELECTOR_VARIANTS.names) {
       const nameEl = card.querySelector(selector) as HTMLElement | null;
       if (nameEl && nameEl.innerText.trim()) {
         name = nameEl.innerText.trim();
-        console.log(`  Name (${selector}): "${name}"`);
         break;
       }
     }
     
-    if (!name) {
-      console.log(`  ✗ No name found, skipping card`);
-      return;
-    }
+    if (!name) return;
 
     // Try to find time/last updated
     let lastUpdated = "Unknown";
@@ -177,13 +199,11 @@ function scrapeVisibleLeads(cardSelector: string): Lead[] {
       const timeEl = card.querySelector(selector) as HTMLElement | null;
       if (timeEl && timeEl.innerText.trim()) {
         lastUpdated = timeEl.innerText.trim();
-        console.log(`  Time (${selector}): "${lastUpdated}"`);
         break;
       }
     }
 
     const status = extractStatus(card);
-    console.log(`  Status: ${status}`);
 
     leads.push({
       name,
@@ -196,32 +216,21 @@ function scrapeVisibleLeads(cardSelector: string): Lead[] {
 }
 
 async function scrapeAllLeads(): Promise<Lead[]> {
-  console.log("\n=== Starting scrape ===");
-  
   // Find working scroll container
   const scrollSelector = findWorkingSelector(SELECTOR_VARIANTS.scrollContainers);
   if (!scrollSelector) {
-    console.error("❌ Could not find scroll container!");
-    console.log("Available elements with 'scroll' in class:", 
-      Array.from(document.querySelectorAll("[class*='scroll']")).map(el => el.className)
-    );
+    console.error("OpciSync: Could not find scroll container");
     return [];
   }
   
   const container = document.querySelector(scrollSelector) as HTMLElement;
-  console.log(`Using scroll container: ${scrollSelector}`);
   
   // Find working lead card selector
   const cardSelector = findWorkingSelector(SELECTOR_VARIANTS.leadCards);
   if (!cardSelector) {
-    console.error("❌ Could not find any lead cards!");
-    console.log("Available elements with 'Referral' in class:", 
-      Array.from(document.querySelectorAll("[class*='Referral']")).map(el => el.className)
-    );
+    console.error("OpciSync: Could not find any lead cards");
     return [];
   }
-  
-  console.log(`Using card selector: ${cardSelector}`);
 
   const collected = new Map<string, Lead>();
   let stagnant = 0;
@@ -234,8 +243,6 @@ async function scrapeAllLeads(): Promise<Lead[]> {
     });
 
     const afterSize = collected.size;
-    console.log(`\n--- Scroll ${stagnant + 1}: ${afterSize} unique leads (${afterSize - before} new) ---`);
-
     stagnant = afterSize === before ? stagnant + 1 : 0;
 
     container.scrollTop = container.scrollHeight;
@@ -243,34 +250,152 @@ async function scrapeAllLeads(): Promise<Lead[]> {
   }
 
   const finalLeads = Array.from(collected.values());
-  console.log(`\n=== Scrape complete: ${finalLeads.length} total leads ===`);
+  console.log(`OpciSync: Scraped ${finalLeads.length} leads`);
   return finalLeads;
+}
+
+/* ---------------- Auto Update Functions ---------------- */
+
+async function clickFirstLead(): Promise<boolean> {
+  console.log("OpciSync: Attempting to click first lead...");
+  
+  // Find the first lead card
+  const cardSelector = findWorkingSelector(SELECTOR_VARIANTS.leadCards);
+  if (!cardSelector) {
+    console.error("OpciSync: Could not find lead card selector");
+    return false;
+  }
+
+  const firstCard = document.querySelector(cardSelector) as HTMLElement;
+  if (!firstCard) {
+    console.error("OpciSync: No lead cards found");
+    return false;
+  }
+
+  // Get the lead name for logging
+  const nameEl = firstCard.querySelector("[class*='name']") as HTMLElement;
+  const leadName = nameEl?.innerText.trim() || "Unknown";
+  
+  console.log(`OpciSync: Clicking lead: ${leadName}`);
+  firstCard.click();
+  
+  // Wait for detail page to load
+  await sleep(1500);
+  
+  return true;
+}
+
+async function clickUpdateStatusButton(): Promise<boolean> {
+  console.log("OpciSync: Looking for Update Status button...");
+  
+  // Wait a bit to ensure the page has loaded
+  await sleep(500);
+  
+  // Find the Update Status button
+  const updateButton = findElement(SELECTOR_VARIANTS.updateStatusButton);
+  
+  if (!updateButton) {
+    console.error("OpciSync: Update Status button not found");
+    console.log("Available buttons:", 
+      Array.from(document.querySelectorAll("button")).map(b => ({
+        class: b.className,
+        text: b.textContent?.trim()
+      }))
+    );
+    return false;
+  }
+
+  console.log(`OpciSync: Found Update Status button: ${updateButton.className}`);
+  updateButton.click();
+  
+  // Wait for action to complete
+  await sleep(1000);
+  
+  return true;
+}
+
+async function navigateBack(): Promise<void> {
+  console.log("OpciSync: Navigating back...");
+  
+  // Try to find back button
+  const backButton = findElement(SELECTOR_VARIANTS.backButton);
+  
+  if (backButton) {
+    console.log("OpciSync: Found back button, clicking...");
+    backButton.click();
+  } else {
+    // Fallback: use browser back
+    console.log("OpciSync: Back button not found, using history.back()");
+    window.history.back();
+  }
+  
+  // Wait for navigation
+  await sleep(1500);
+}
+
+async function testAutoUpdate(): Promise<void> {
+  showSpinner("Opening first lead...");
+  
+  try {
+    // Step 1: Click into the first lead
+    const leadClicked = await clickFirstLead();
+    if (!leadClicked) {
+      throw new Error("Failed to click lead");
+    }
+    
+    updateSpinnerMessage("Clicking Update Status...");
+    
+    // Step 2: Click the Update Status button
+    const buttonClicked = await clickUpdateStatusButton();
+    if (!buttonClicked) {
+      throw new Error("Failed to click Update Status button");
+    }
+    
+    updateSpinnerMessage("Success! Navigating back...");
+    
+    // Step 3: Navigate back to the list
+    await navigateBack();
+    
+    hideSpinner();
+    
+    chrome.runtime.sendMessage({
+      type: "UPDATE_COMPLETE",
+      payload: { success: true, message: "Successfully updated first lead" }
+    });
+    
+  } catch (error) {
+    console.error("OpciSync: Auto-update failed:", error);
+    hideSpinner();
+    
+    chrome.runtime.sendMessage({
+      type: "UPDATE_COMPLETE",
+      payload: { 
+        success: false, 
+        message: error instanceof Error ? error.message : "Unknown error" 
+      }
+    });
+  }
 }
 
 /* ---------------- Message Bridge ---------------- */
 
 chrome.runtime.onMessage.addListener(async (msg) => {
-  if (msg.type !== "SCRAPE_LEADS") return;
+  if (msg.type === "SCRAPE_LEADS") {
+    showSpinner("Syncing leads…");
 
-  console.log("🚀 Starting lead scrape...");
+    const leads = await scrapeAllLeads();
+
+    hideSpinner();
+
+    chrome.runtime.sendMessage({
+      type: "LEADS_SCRAPED",
+      payload: leads
+    });
+  }
   
-  // Debug: Show all elements with common class patterns
-  console.log("\n--- Page Analysis ---");
-  console.log("Elements with 'Referral':", document.querySelectorAll("[class*='Referral']").length);
-  console.log("Elements with 'scroll':", document.querySelectorAll("[class*='scroll']").length);
-  console.log("Elements with 'List':", document.querySelectorAll("[class*='List']").length);
-  
-  showSpinner();
-
-  const leads = await scrapeAllLeads();
-
-  hideSpinner();
-
-  console.log(`📤 Sending ${leads.length} leads back to extension`);
-  chrome.runtime.sendMessage({
-    type: "LEADS_SCRAPED",
-    payload: leads
-  });
+  if (msg.type === "TEST_AUTO_UPDATE") {
+    await testAutoUpdate();
+  }
 });
 
-console.log("✅ OpciSync content script loaded");
+console.log("OpciSync content script loaded");

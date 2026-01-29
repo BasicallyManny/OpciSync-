@@ -5,10 +5,14 @@ export default function App() {
   const [leads, setLeads] = useState<Lead[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string>("");
+  const [updateStatus, setUpdateStatus] = useState<string>("");
+  const [hasSynced, setHasSynced] = useState(false);
 
   const sync = async () => {
     setLoading(true);
     setError("");
+    setUpdateStatus("");
+    setHasSynced(false);
 
     try {
       const [tab] = await chrome.tabs.query({
@@ -39,16 +43,60 @@ export default function App() {
     }
   };
 
+  const testAutoUpdate = async () => {
+    setUpdateStatus("Testing auto-update...");
+    setError("");
+
+    try {
+      const [tab] = await chrome.tabs.query({
+        active: true,
+        currentWindow: true
+      });
+
+      if (!tab.id) {
+        setError("No active tab found");
+        setUpdateStatus("");
+        return;
+      }
+
+      if (!tab.url?.includes("opcity.com")) {
+        setError("Please navigate to an OpCity page");
+        setUpdateStatus("");
+        return;
+      }
+
+      // Send message through background script to ensure content script is injected
+      chrome.runtime.sendMessage({
+        type: "START_AUTO_UPDATE",
+        tabId: tab.id
+      });
+    } catch (err) {
+      setError("Failed to test auto-update");
+      setUpdateStatus("");
+      console.error(err);
+    }
+  };
+
   useEffect(() => {
-    type RuntimeMessage =
-      | { type: "LEADS_SYNCED"; payload: Lead[] }
-      | { type: string; [key: string]: unknown };
+    type LeadsSyncedMessage = { type: "LEADS_SYNCED"; payload: Lead[] };
+    type UpdateCompleteMessage = { type: "UPDATE_COMPLETE"; payload: { success: boolean; message: string } };
+    type RuntimeMessage = LeadsSyncedMessage | UpdateCompleteMessage;
 
     const listener = (msg: RuntimeMessage) => {
       console.log("Popup received message:", msg);
+      
       if (msg.type === "LEADS_SYNCED") {
-        setLeads(msg.payload as Lead[]);
+        setLeads(msg.payload);
         setLoading(false);
+        setHasSynced(true); // Enable update button after successful sync
+      }
+      
+      if (msg.type === "UPDATE_COMPLETE") {
+        if (msg.payload.success) {
+          setUpdateStatus(`✓ ${msg.payload.message}`);
+        } else {
+          setError(`✗ ${msg.payload.message}`);
+        }
       }
     };
 
@@ -79,19 +127,37 @@ export default function App() {
   return (
     <div className="w-96 p-4 text-sm">
       <div className="mb-3">
-        <h1 className="text-lg font-bold mb-2">OpCity Lead Sync</h1>
+        <h1 className="text-lg font-bold mb-3">OpCity Lead Sync</h1>
         
-        <button
-          onClick={sync}
-          disabled={loading}
-          className="w-full rounded bg-blue-600 py-2 text-white hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
-        >
-          {loading ? "Syncing…" : "Sync Leads"}
-        </button>
+        <div className="space-y-2">
+          <button
+            onClick={sync}
+            disabled={loading}
+            className="w-full rounded bg-blue-600 py-2 text-white hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {loading ? "Syncing…" : "Sync Leads"}
+          </button>
+
+          {hasSynced && (
+            <button
+              onClick={testAutoUpdate}
+              disabled={loading}
+              className="w-full rounded bg-purple-600 py-2 text-white hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              🧪 Test Auto-Update (First Lead)
+            </button>
+          )}
+        </div>
 
         {error && (
           <div className="mt-2 p-2 bg-red-100 text-red-700 rounded text-xs">
             {error}
+          </div>
+        )}
+
+        {updateStatus && (
+          <div className="mt-2 p-2 bg-green-100 text-green-700 rounded text-xs">
+            {updateStatus}
           </div>
         )}
 
