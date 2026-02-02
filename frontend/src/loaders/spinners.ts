@@ -7,7 +7,7 @@ export function showSpinner(message = "Working…") {
       .opcisync-backdrop {
         position: fixed;
         inset: 0;
-        background: rgba(15,23,42,.6);
+        background: rgb(15,23,42);
         z-index: 999999;
         display: flex;
         align-items: center;

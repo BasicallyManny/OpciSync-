@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import type { Lead } from "./types/types";
-
+import logo from "../public/icons/icon48.png";
 export default function App() {
   const [leads, setLeads] = useState<Lead[]>([]);
   const [loading, setLoading] = useState(false);
@@ -71,7 +71,7 @@ export default function App() {
         tabId: tab.id
       });
     } catch (err) {
-      setError("Failed to test auto-update");
+      setError("Failed to auto-update");
       setUpdateStatus("");
       console.error(err);
     }
@@ -84,13 +84,13 @@ export default function App() {
 
     const listener = (msg: RuntimeMessage) => {
       console.log("Popup received message:", msg);
-      
+
       if (msg.type === "LEADS_SYNCED") {
         setLeads(msg.payload);
         setLoading(false);
         setHasSynced(true); // Enable update button after successful sync
       }
-      
+
       if (msg.type === "UPDATE_COMPLETE") {
         if (msg.payload.success) {
           setUpdateStatus(`✓ ${msg.payload.message}`);
@@ -125,54 +125,74 @@ export default function App() {
   };
 
   return (
-    <div className="w-96 p-4 text-sm">
-      <div className="mb-3">
-        <h1 className="text-lg font-bold mb-3">OpCity Lead Sync</h1>
-        
-        <div className="space-y-2">
-          <button
-            onClick={sync}
-            disabled={loading}
-            className="w-full rounded bg-blue-600 py-2 text-white hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {loading ? "Syncing…" : "Sync Leads"}
-          </button>
-
-          {hasSynced && (
-            <button
-              onClick={testAutoUpdate}
-              disabled={loading}
-              className="w-full rounded bg-purple-600 py-2 text-white hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              🧪 Test Auto-Update (First Lead)
-            </button>
-          )}
+    <div className="relative w-96 bg-gray-50 p-4 text-sm text-gray-800">
+      {/* LOADING OVERLAY */}
+      {loading && (
+        <div className="absolute inset-0 bg-gray-300 z-50 flex flex-col items-center justify-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-4 border-gray-400 border-t-orange-500 mb-3" />
+          <span className="text-gray-700 font-medium">Syncing leads…</span>
         </div>
+      )}
 
-        {error && (
-          <div className="mt-2 p-2 bg-red-100 text-red-700 rounded text-xs">
-            {error}
-          </div>
-        )}
+      {/* HEADER */}
+      <div className="mb-4 flex items-center gap-2">
+        <img src={logo} alt="NextHome" className="h-8 w-8" />
+        <div>
+          <h1 className="text-lg font-semibold leading-tight">
+            OpCity Lead Sync
+          </h1>
+          <p className="text-xs text-gray-500">
+            NextHome Automation
+          </p>
+        </div>
+      </div>
 
-        {updateStatus && (
-          <div className="mt-2 p-2 bg-green-100 text-green-700 rounded text-xs">
-            {updateStatus}
-          </div>
-        )}
+      {/* ACTIONS */}
+      <div className="space-y-2 mb-3">
+        <button
+          onClick={sync}
+          disabled={loading}
+          className="w-full rounded bg-orange-500 py-2 text-white font-medium hover:bg-orange-600 disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          Sync Leads
+        </button>
 
-        {leads.length > 0 && (
-          <div className="mt-2 text-xs text-gray-600">
-            Found {leads.length} lead{leads.length !== 1 ? "s" : ""}
-          </div>
+        {hasSynced && (
+          <button
+            onClick={testAutoUpdate}
+            disabled={loading}
+            className="w-full rounded bg-gray-700 py-2 text-white hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            Auto-Update
+          </button>
         )}
       </div>
 
+      {/* STATUS MESSAGES */}
+      {error && (
+        <div className="mb-2 rounded bg-red-100 p-2 text-xs text-red-700">
+          {error}
+        </div>
+      )}
+
+      {updateStatus && (
+        <div className="mb-2 rounded bg-green-100 p-2 text-xs text-green-700">
+          {updateStatus}
+        </div>
+      )}
+
+      {leads.length > 0 && (
+        <div className="mb-2 text-xs text-gray-500">
+          Found {leads.length} lead{leads.length !== 1 ? "s" : ""}
+        </div>
+      )}
+
+      {/* LEAD LIST */}
       <div className="space-y-2 max-h-96 overflow-y-auto">
         {leads.map((lead, i) => (
           <div
             key={i}
-            className="flex items-center justify-between rounded border p-2 hover:bg-gray-50"
+            className="flex items-center justify-between rounded border border-gray-200 bg-white p-2 hover:bg-gray-50"
           >
             <div className="flex-1 min-w-0">
               <div className="font-semibold truncate">{lead.name}</div>
@@ -181,7 +201,11 @@ export default function App() {
               </div>
             </div>
 
-            <span className={`ml-2 rounded px-2 py-1 text-xs font-medium whitespace-nowrap ${getStatusColor(lead.status)}`}>
+            <span
+              className={`ml-2 rounded px-2 py-1 text-xs font-medium whitespace-nowrap ${getStatusColor(
+                lead.status
+              )}`}
+            >
               {lead.status}
             </span>
           </div>

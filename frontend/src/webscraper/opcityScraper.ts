@@ -145,14 +145,14 @@ export async function clickSubmitButton(): Promise<boolean> {
 
   const drawer = document.querySelector(".StatusUpdateDrawer");
   if (!drawer) {
-    console.error("❌ Drawer not found");
+    console.error("Drawer not found");
     return false;
   }
 
   // The .StatusSubmitButton is a wrapper div - find the actual button inside it!
   const buttonWrapper = drawer.querySelector(".StatusSubmitButton");
   if (!buttonWrapper) {
-    console.error("❌ Button wrapper not found");
+    console.error("Button wrapper not found");
     return false;
   }
 
@@ -160,12 +160,12 @@ export async function clickSubmitButton(): Promise<boolean> {
     "button",
   ) as HTMLButtonElement | null;
   if (!actualButton) {
-    console.error("❌ Actual button not found inside wrapper");
+    console.error("Actual button not found inside wrapper");
     return false;
   }
 
   if (actualButton.disabled) {
-    console.error("❌ Button is disabled");
+    console.error("Button is disabled");
     return false;
   }
 
@@ -176,11 +176,11 @@ export async function clickSubmitButton(): Promise<boolean> {
 
   const stillOpen = document.querySelector(".StatusUpdateDrawer");
   if (!stillOpen) {
-    console.log("✓✓✓ SUCCESS! ✓✓✓");
+    console.log("SUCCESS!");
     return true;
   }
 
-  console.error("❌ Click didn't work");
+  console.error("Click didn't work");
   return false;
 }
 
