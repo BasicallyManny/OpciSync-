@@ -90,7 +90,7 @@ import { clickFirstLead, clickSubmitButton, clickUpdateButton, selectStatusAndEn
 
           // Wait for page to navigate back and fully load
           console.log("Waiting for page to navigate back...");
-          await sleep(5000);
+          await sleep(70000);
           
           // Verify we're back on the list page
           let retries = 0;
