@@ -3,6 +3,9 @@ export type LeadStatus =
   | "MET"
   | "OFFER"
   | "CONTRACT"
+  | "We Received Offers"
+  | "Negotiating Lease"
+  | "Unknown"
   | "CLOSE";
 
 export interface Lead {
