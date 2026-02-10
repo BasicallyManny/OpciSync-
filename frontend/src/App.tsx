@@ -119,6 +119,10 @@ export default function App() {
         return "bg-purple-100 text-purple-800";
       case "CLOSE":
         return "bg-gray-800 text-white";
+      case "Negotiating Lease":
+        return "bg-orange-100 text-orange-800";
+      case "Unknown":
+        return "bg-red-100 text-gray-800";
       default:
         return "bg-gray-100 text-gray-800";
     }

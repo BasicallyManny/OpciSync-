@@ -18,8 +18,9 @@ export function extractStatus(card: Element): LeadStatus {
     if (text.includes("OFFER")) return "OFFER";
     if (text.includes("CONTRACT")) return "CONTRACT";
     if (text.includes("CLOSE")) return "CLOSE";
+    if (text.includes("Negotiating Lease")) return "Negotiating Lease";
   }
-  return "SPOKE";
+  return "Unknown";
 }
 
 export function scrapeVisible(selector: string): Lead[] {
