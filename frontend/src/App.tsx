@@ -123,6 +123,8 @@ export default function App() {
         return "bg-orange-100 text-orange-800";
       case "Unknown":
         return "bg-red-100 text-gray-800";
+      case "We Met / Listed Home":
+        return "bg-red-100 text-gray-800";
       default:
         return "bg-gray-100 text-gray-800";
     }

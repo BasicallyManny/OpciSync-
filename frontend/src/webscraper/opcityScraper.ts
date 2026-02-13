@@ -19,6 +19,9 @@ export function extractStatus(card: Element): LeadStatus {
     if (text.includes("CONTRACT")) return "CONTRACT";
     if (text.includes("CLOSE")) return "CLOSE";
     if (text.includes("Negotiating Lease")) return "Negotiating Lease";
+    if (text.includes("We Received Offers")) return "We Received Offers";
+    if (text.includes("Unknown")) return "Unknown";
+    if (text.includes("We Met / Listed Home")) return "We Met / Listed Home";
   }
   return "Unknown";
 }

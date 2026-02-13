@@ -66,8 +66,8 @@ import {
 
         // Check if status is OFFER - skip if so
         const status = extractStatus(currentCard);
-        if (status === "OFFER" || status === "We Received Offers" || status === "Negotiating Lease" || status === "Unknown") {
-          console.log(`⊘ Skipping lead ${leadNum} - status is OFFER`);
+        if (status === "OFFER" || status === "We Received Offers" || status === "Negotiating Lease" || status === "Unknown" || status === "We Met / Listed Home") {
+          console.log(`⊘ Skipping lead ${leadNum} - status is ${status}`);
           skippedCount++;
           currentIndex++;
           continue; // Skip to next lead without clicking

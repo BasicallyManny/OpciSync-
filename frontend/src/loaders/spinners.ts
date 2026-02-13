@@ -10,6 +10,7 @@ export function showSpinner(message = "Working…") {
         z-index: 999999;
         display: flex;
         align-items: center;
+        background: rgb(15,23,42);
         justify-content: center;
       }
       .opcisync-box {
