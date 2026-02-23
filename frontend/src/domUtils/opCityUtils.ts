@@ -1,6 +1,5 @@
 export const selectors = {
   scrollContainers: [
-    ".ReferralList__scrollingwindow",
     ".ReferralList_scrollingwindow",
     "[class*='scrollingwindow']",
     "[class*='ReferralList']",
