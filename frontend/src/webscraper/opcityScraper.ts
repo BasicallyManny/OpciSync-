@@ -2,6 +2,7 @@ import type { LeadStatus, Lead } from "../types/types";
 import {
   findElement,
   findSelector,
+  getNeedsActionContainer,
   isInLeadView,
   selectors,
   setReactTextareaValue,
@@ -26,10 +27,14 @@ export function extractStatus(card: Element): LeadStatus {
   return "Unknown";
 }
 
-export function scrapeVisible(selector: string): Lead[] {
+export function scrapeVisible(
+  selector: string,
+  root: Element | Document = document,
+): Lead[] {
   const results: Lead[] = [];
 
-  document.querySelectorAll(selector).forEach((card) => {
+  // ✅ Use `root` instead of `document`
+  root.querySelectorAll(selector).forEach((card) => {
     let name = "";
     for (const sel of selectors.names) {
       const el = card.querySelector(sel) as HTMLElement | null;
@@ -88,7 +93,9 @@ export async function clickUpdateButton(): Promise<boolean> {
   return true;
 }
 
-export async function selectStatusAndEnterDate(): Promise<boolean> {
+export async function selectStatusAndEnterDate(
+  status: LeadStatus | null,
+): Promise<boolean> {
   await sleep(800);
 
   const buttons = document.querySelectorAll(
@@ -96,7 +103,14 @@ export async function selectStatusAndEnterDate(): Promise<boolean> {
   );
   if (!buttons.length) return false;
 
-  (buttons[0] as HTMLElement).click();
+  const targetButton = (status === "MET" ? buttons[1] : buttons[0]) as HTMLElement | null;
+
+  if (!targetButton) {
+    console.error(`Could not find status button for: ${status}`);
+    return false;
+  }
+
+  targetButton.click();
   await sleep(1200);
 
   const textarea = document.querySelector(
@@ -173,7 +187,7 @@ export async function clickSubmitButton(): Promise<boolean> {
     return false;
   }
 
-  console.log("✓ Found actual button, clicking...");
+  console.log("Found actual button, clicking...");
   actualButton.click();
 
   await sleep(2500);
@@ -188,22 +202,26 @@ export async function clickSubmitButton(): Promise<boolean> {
   return false;
 }
 
-export  async function scrapeAllLeads(): Promise<Lead[]> {
-    const scrollSel = findSelector(selectors.scrollContainers);
-    const cardSel = findSelector(selectors.leadCards);
-    if (!scrollSel || !cardSel) return [];
+export async function scrapeAllLeads(): Promise<Lead[]> {
+  const scrollSel = findSelector(selectors.scrollContainers);
+  const cardSel = findSelector(selectors.leadCards);
+  if (!scrollSel || !cardSel) return [];
 
-    const scrollEl = document.querySelector(scrollSel) as HTMLElement;
-    const map = new Map<string, Lead>();
-    let stable = 0;
+  const scrollEl = document.querySelector(scrollSel) as HTMLElement;
+  const map = new Map<string, Lead>();
+  let stable = 0;
 
-    while (stable < 3) {
-      const before = map.size;
-      scrapeVisible(cardSel).forEach(l => map.set(l.name, l));
-      stable = map.size === before ? stable + 1 : 0;
-      scrollEl.scrollTop = scrollEl.scrollHeight;
-      await sleep(1200);
-    }
+  while (stable < 3) {
+    const before = map.size;
 
-    return [...map.values()];
+    const container = getNeedsActionContainer();
+    const root: Element | Document = container ?? document;
+    scrapeVisible(cardSel, root).forEach((l) => map.set(l.name, l));
+
+    stable = map.size === before ? stable + 1 : 0;
+    scrollEl.scrollTop = scrollEl.scrollHeight;
+    await sleep(1200);
   }
+
+  return [...map.values()];
+}

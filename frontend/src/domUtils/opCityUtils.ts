@@ -1,7 +1,7 @@
 export const selectors = {
   scrollContainers: [
-    ".ReferralList_scrollingwindow",
-    "[class*='scrollingwindow']",
+    ".ReferralList__scrollwindow", 
+    "[class*='scrollwindow']",
     "[class*='ReferralList']",
   ],
   leadCards: [
@@ -27,6 +27,27 @@ export const selectors = {
     "button[class*='Update']",
   ],
 };
+
+/**
+ * Finds the ReferralList__section__content that belongs to the "Needs Action" section.
+ * The DOM structure is:
+ *   .ReferralList__section
+ *     .ReferralList__section__header  ← contains "Needs Action" text
+ *     .ReferralList__section__content ← contains the lead cards we want
+ */
+export function getNeedsActionContainer(): Element | null {
+  const headers = document.querySelectorAll(".ReferralList__section__header");
+  for (const header of Array.from(headers)) {
+    if (header.textContent?.trim() === "Needs Action") {
+      // The content div is the next sibling element
+      const content = header.nextElementSibling;
+      if (content?.classList.contains("ReferralList__section__content")) {
+        return content;
+      }
+    }
+  }
+  return null;
+}
 
 export function setReactTextareaValue(
   textarea: HTMLTextAreaElement,
@@ -55,5 +76,5 @@ export function findElement(list: string[]) {
 }
 
 export function isInLeadView(): boolean {
-    return !!findElement(selectors.updateStatusButton);
-  }
+  return !!findElement(selectors.updateStatusButton);
+}
