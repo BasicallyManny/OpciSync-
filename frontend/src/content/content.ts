@@ -19,171 +19,205 @@ import {
   let isRunning = false;
 
   async function runAutoUpdate() {
-  if (isRunning) return;
-  isRunning = true;
+    if (isRunning) return;
+    isRunning = true;
 
-  try {
-    showSpinner("Counting leads…");
+    try {
+      showSpinner("Counting leads…");
 
-    const cardSel = findSelector(selectors.leadCards);
-    if (!cardSel) throw new Error("Cannot find leads");
+      const cardSel = findSelector(selectors.leadCards);
+      if (!cardSel) throw new Error("Cannot find leads");
 
-    const container = getNeedsActionContainer();
-    if (!container) throw new Error('Cannot find "Needs Action" section');
+      const container = getNeedsActionContainer();
+      if (!container) throw new Error('Cannot find "Needs Action" section');
 
-    const totalLeads = container.querySelectorAll(cardSel).length;
-    console.log(`Found ${totalLeads} leads to update`);
-    if (totalLeads === 0) throw new Error("No leads found in Needs Action");
+      // Scroll to load all cards before counting
+      const scrollSel = findSelector(selectors.scrollContainers);
+      const scrollEl = scrollSel
+        ? (document.querySelector(scrollSel) as HTMLElement | null)
+        : null;
 
-    let successCount = 0;
-    let failCount = 0;
-    let skippedCount = 0;
-    let skipIndex = 0; // only increments for skips/fails, not successes
-
-    while (true) {
-      // Re-scope every iteration
-      const freshContainer = getNeedsActionContainer();
-      if (!freshContainer) {
-        console.log("Needs Action section gone — all leads processed");
-        break;
+      if (scrollEl) {
+        let stableCount = 0;
+        let lastCount = 0;
+        while (stableCount < 3) {
+          scrollEl.scrollTop = scrollEl.scrollHeight;
+          await sleep(1200);
+          const currentCount = container.querySelectorAll(cardSel).length;
+          console.log(`Scroll loading: ${currentCount} cards found`);
+          stableCount = currentCount === lastCount ? stableCount + 1 : 0;
+          lastCount = currentCount;
+        }
+        scrollEl.scrollTop = 0; // scroll back to top before processing
+        await sleep(500);
       }
 
-      const currentCards = freshContainer.querySelectorAll(cardSel);
-      
-      // No more cards left
-      if (skipIndex >= currentCards.length) {
-        console.log("No more leads to process");
-        break;
-      }
+      const totalLeads = container.querySelectorAll(cardSel).length;
+      console.log(`Found ${totalLeads} leads to update`);
+      if (totalLeads === 0) throw new Error("No leads found in Needs Action");
 
-      const currentCard = currentCards[skipIndex];
-      const leadNum = successCount + skippedCount + failCount + 1;
-      console.log(`\n=== Checking lead ${leadNum} (index ${skipIndex}/${currentCards.length}) ===`);
-      updateSpinner(`Processing lead ${leadNum}…`);
+      let successCount = 0;
+      let failCount = 0;
+      let skippedCount = 0;
+      let skipIndex = 0;
 
-      try {
-        const status = extractStatus(currentCard);
-
-        if (
-          status === "OFFER" ||
-          status === "We Received Offers" ||
-          status === "Negotiating Lease" ||
-          status === "Unknown" ||
-          status === "We Met / Listed Home"
-        ) {
-          console.log(`Skipping lead ${leadNum} - status is ${status}`);
-          skippedCount++;
-          skipIndex++; // move past this card since it won't be removed
-          continue;
+      while (true) {
+        // Re-scope every iteration
+        const freshContainer = getNeedsActionContainer();
+        if (!freshContainer) {
+          console.log("Needs Action section gone — all leads processed");
+          break;
         }
 
-        // Click the lead
-        (currentCard as HTMLElement).click();
-        await sleep(3000);
+        const currentCards = freshContainer.querySelectorAll(cardSel);
 
-        // Wait for update button
-        let retries = 0;
-        while (!findElement(selectors.updateStatusButton) && retries < 3) {
-          await sleep(1000);
-          retries++;
+        // No more cards left
+        if (skipIndex >= currentCards.length) {
+          console.log("No more leads to process");
+          break;
         }
 
-        updateSpinner(`Lead ${leadNum}: Opening Update Status…`);
+        const currentCard = currentCards[skipIndex];
+        const leadNum = successCount + skippedCount + failCount + 1;
+        console.log(`\n=== Checking lead ${leadNum} (index ${skipIndex}/${currentCards.length}) ===`);
+        updateSpinner(`Processing lead ${leadNum}…`);
 
-        if (!await clickUpdateButton()) {
-          console.error(`Failed to click Update Status for lead ${leadNum}`);
-          failCount++;
-          skipIndex++; // skip past this card
-          window.history.back();
-          await sleep(1500);
-          continue;
-        }
+        try {
+          const status = extractStatus(currentCard);
 
-        updateSpinner(`Lead ${leadNum}: Entering date…`);
+          if (
+            status === "OFFER" ||
+            status === "We Received Offers" ||
+            status === "Negotiating Lease" ||
+            status === "Unknown" ||
+            status === "We Met / Listed Home"
+          ) {
+            console.log(`⊘ Skipping lead ${leadNum} - status is ${status}`);
+            skippedCount++;
+            skipIndex++;
+            continue;
+          }
 
-        if (!await selectStatusAndEnterDate(status)) {
-          console.error(`Failed to enter date for lead ${leadNum}`);
+          // Click the lead
+          (currentCard as HTMLElement).click();
+          await sleep(3000);
+
+          // Wait for update button
+          let retries = 0;
+          while (!findElement(selectors.updateStatusButton) && retries < 3) {
+            await sleep(1000);
+            retries++;
+          }
+
+          updateSpinner(`Lead ${leadNum}: Opening Update Status…`);
+
+          if (!await clickUpdateButton()) {
+            console.error(`Failed to click Update Status for lead ${leadNum}`);
+            failCount++;
+            skipIndex++;
+            window.history.back();
+            await sleep(1500);
+            continue;
+          }
+
+          updateSpinner(`Lead ${leadNum}: Entering date…`);
+
+          if (!await selectStatusAndEnterDate(status)) {
+            console.error(`Failed to enter date for lead ${leadNum}`);
+            failCount++;
+            skipIndex++;
+            const closeBtn = document.querySelector("[class*='close'], [aria-label*='close']");
+            if (closeBtn) (closeBtn as HTMLElement).click();
+            await sleep(1000);
+            continue;
+          }
+
+          updateSpinner(`Lead ${leadNum}: Submitting…`);
+
+          if (!await clickSubmitButton()) {
+            console.error(`Failed to submit for lead ${leadNum}`);
+            failCount++;
+            skipIndex++;
+            continue;
+          }
+
+          console.log(`Successfully updated lead ${leadNum}`);
+          successCount++;
+          // DON'T increment skipIndex — updated lead drops off the list
+          // so cards[skipIndex] naturally points to the next lead
+
+          // Poll until list is ready again
+          console.log("Waiting for list to reload...");
+          let backRetries = 0;
+          while (backRetries < 20) {
+            await sleep(3000);
+            const freshCheck = getNeedsActionContainer();
+            if (freshCheck && freshCheck.querySelectorAll(cardSel).length > 0) {
+              console.log("List ready, continuing...");
+              break;
+            }
+            console.log(`List not ready yet, retry ${backRetries + 1}/20...`);
+            backRetries++;
+          }
+
+          // Scroll to trigger lazy loading of next batch
+          if (scrollEl) {
+            scrollEl.scrollTop = 0;
+            await sleep(500);
+            scrollEl.scrollTop = scrollEl.scrollHeight;
+            await sleep(1500);
+            console.log(`Scrolled list, cards now visible: ${getNeedsActionContainer()?.querySelectorAll(cardSel).length ?? 0}`);
+          }
+
+        } catch (error) {
+          console.error(`Error processing lead ${leadNum}:`, error);
           failCount++;
           skipIndex++;
-          const closeBtn = document.querySelector("[class*='close'], [aria-label*='close']");
-          if (closeBtn) (closeBtn as HTMLElement).click();
-          await sleep(1000);
-          continue;
-        }
 
-        updateSpinner(`Lead ${leadNum}: Submitting…`);
-
-        if (!await clickSubmitButton()) {
-          console.error(`Failed to submit for lead ${leadNum}`);
-          failCount++;
-          skipIndex++; // skip past this card
-          continue;
-        }
-
-        console.log(`Successfully updated lead ${leadNum}`);
-        successCount++;
-        console.log("Waiting for list to reload...");
-        let backRetries = 0;
-        while (backRetries < 20) {
-          await sleep(3000);
-          const freshCheck = getNeedsActionContainer();
-          if (freshCheck && freshCheck.querySelectorAll(cardSel).length > 0) {
-            console.log("List ready, continuing...");
-            break;
+          if (window.location.href.includes('/referral/')) {
+            window.history.back();
+            await sleep(1500);
           }
-          console.log(`List not ready yet, retry ${backRetries + 1}/20...`);
-          backRetries++;
-        }
-
-      } catch (error) {
-        console.error(`Error processing lead ${leadNum}:`, error);
-        failCount++;
-        skipIndex++;
-
-        if (window.location.href.includes('/referral/')) {
-          window.history.back();
-          await sleep(1500);
         }
       }
+
+      hideSpinner();
+
+      const total = successCount + skippedCount + failCount;
+      const message = `Updated ${successCount} of ${total} leads` +
+        (skippedCount > 0 ? ` (${skippedCount} skipped)` : '') +
+        (failCount > 0 ? ` (${failCount} failed)` : '');
+
+      console.log(`\n=== COMPLETE ===`);
+      console.log(message);
+
+      chrome.runtime.sendMessage({
+        type: "UPDATE_COMPLETE",
+        payload: {
+          success: true,
+          message,
+          stats: {
+            total,
+            success: successCount,
+            skipped: skippedCount,
+            failed: failCount
+          }
+        }
+      });
+
+    } catch (err) {
+      hideSpinner();
+      chrome.runtime.sendMessage({
+        type: "UPDATE_COMPLETE",
+        payload: {
+          success: false,
+          message: err instanceof Error ? err.message : "Unknown error"
+        }
+      });
+    } finally {
+      isRunning = false;
     }
-
-    hideSpinner();
-
-    const total = successCount + skippedCount + failCount;
-    const message = `Updated ${successCount} of ${total} leads` +
-      (skippedCount > 0 ? ` (${skippedCount} skipped)` : '') +
-      (failCount > 0 ? ` (${failCount} failed)` : '');
-
-    console.log(`\n=== COMPLETE ===`);
-    console.log(message);
-
-    chrome.runtime.sendMessage({
-      type: "UPDATE_COMPLETE",
-      payload: {
-        success: true,
-        message,
-        stats: {
-          total,
-          success: successCount,
-          skipped: skippedCount,
-          failed: failCount
-        }
-      }
-    });
-
-  } catch (err) {
-    hideSpinner();
-    chrome.runtime.sendMessage({
-      type: "UPDATE_COMPLETE",
-      payload: {
-        success: false,
-        message: err instanceof Error ? err.message : "Unknown error"
-      }
-    });
-  } finally {
-    isRunning = false;
   }
-}
 
   /* Messages */
 
